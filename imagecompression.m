@@ -1,0 +1,99 @@
+% AIM: Image compression using custom wavelets.
+% The best result is found by varying theta (see vtheta).
+% Depending on the value of flag, all decomposition coefficients 
+% (wavelet and scaling) are compressed or only the wavelet coefficients.
+% Results are displayed for all possible decomposition steps (see Kmax).
+
+close all
+clear all
+
+%% Settings
+flag = 1;   % 0 = compress all coefficients, 1 = compress details only
+
+vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
+vtheta = [0.1:0.1:0.9];
+
+% Normalization factors for the 1-step transforms
+fsca = sqrt(3);
+fwav = sqrt(3/2);
+
+%% Load and prepare image
+% testImage = './Images/lena512.bmp';
+testImage = './Images/peppers512.tiff';
+% testImage = './Images/baboon512.tiff';
+I = imread(testImage);
+I = im2gray(I);
+I = double(I);
+
+Num_I = 512;
+I = I(1:Num_I, 1:Num_I);
+
+[Nor, Mor] = size(I);
+
+%% Decomposition parameters
+Kmax = 5;
+dmin = 3;
+
+%% Main loop
+RESULTS = zeros((Kmax-dmin+1) * length(vkeep), 6);
+cont = 0;
+
+for kstep = dmin:Kmax
+    for keep = vkeep
+        cont = cont + 1;
+
+        %% First theta: initialise error with first vtheta value
+        theta = vtheta(1);
+      
+        [Idec, Iscal, Iwav, lrow, lcol] = DEC(I, theta, kstep, dmin);
+        [thr, zero_el, Icomp]           = THR(Idec, Iscal, Iwav, keep, lrow, lcol, flag);
+        Irec = IFWTmatrix_m(Icomp, lrow, lcol, theta);
+
+        Iout = Irec(1:Nor, 1:Mor);
+        D    = abs(double(I) - double(Iout)).^2;
+        err  = sum(D(:)) / numel(I);
+
+        Ifin      = Iout;
+        theta_fin = theta;
+        kmax      = max(lrow, lcol);
+
+        %% Search remaining theta values for minimum MSE
+        for theta = setdiff(vtheta, vtheta(1))
+
+            [Idec, Iscal, Iwav, lrow, lcol] = DEC(I, theta, kstep, dmin);
+            [thr, zero_el, Icomp]           = THR(Idec, Iscal, Iwav, keep, lrow, lcol, flag);
+            Irec = IFWTmatrix_m(Icomp, lrow, lcol, theta);
+
+            Iout   = Irec(1:Nor, 1:Mor);
+            D      = abs(double(I) - double(Iout)).^2;
+            mseVAL = sum(D(:)) / numel(I);
+
+            if mseVAL < err
+                err       = mseVAL;
+                Ifin      = Iout;
+                theta_fin = theta;
+            end
+        end
+
+        %% Quality metrics
+        psnrVAL = 10 * log10(255^2 / err);
+        SSIMVAL  = ssim(I, Ifin);
+
+        num = length([Iscal; Iwav]);
+
+        RESULTS(cont, :) = [keep, psnrVAL, SSIMVAL, (num - zero_el)*100/(Nor*Mor), theta_fin, kmax]
+
+        figure(cont)
+        colormap(gray)
+        imagesc(Irec)
+        axis off equal
+    end
+end
+
+%% Display results table
+varNames = {'CR', 'PSNR', 'SSIM', '\% retained', 'Best $\theta$', 'Decomp'};
+
+disp('***** OUR CASE *****')
+T = array2table(RESULTS, 'VariableNames', varNames);
+disp(T)
+
