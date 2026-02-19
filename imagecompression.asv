@@ -57,9 +57,6 @@ for kstep = dmin:Kmax
         Irec = IFWTmatrix_m(Icomp, lrow, lcol, theta);
 
         Iout = Irec(1:Nor, 1:Mor);
-        if initial_transformation
-            Iout = ITR2D(Iout,theta);
-        end
         D    = abs(double(I) - double(Iout)).^2;
         err  = sum(D(:)) / numel(I);
 
@@ -69,19 +66,12 @@ for kstep = dmin:Kmax
 
         %% Search remaining theta values for minimum MSE
         for theta = setdiff(vtheta, vtheta(1))
-            if initial_transformation
-                A = TR2D(I,theta);
-            else
-                A = I;
-            end
-            [Idec, Iscal, Iwav, lrow, lcol] = DEC(A, theta, kstep, dmin);
+
+            [Idec, Iscal, Iwav, lrow, lcol] = DEC(I, theta, kstep, dmin);
             [thr, zero_el, Icomp]           = THR(Idec, Iscal, Iwav, keep, lrow, lcol, flag);
             Irec = IFWTmatrix_m(Icomp, lrow, lcol, theta);
 
             Iout   = Irec(1:Nor, 1:Mor);
-            if initial_transformation
-                Iout = ITR2D(Iout,theta);
-            end
             D      = abs(double(I) - double(Iout)).^2;
             mseVAL = sum(D(:)) / numel(I);
 
