@@ -15,14 +15,10 @@ initial_transformation = true;
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
 vtheta = [0.1:0.1:0.9];
 
-% Normalization factors for the 1-step transforms
-fsca = sqrt(3);
-fwav = sqrt(3/2);
-
 %% Load and prepare image
 % testImage = './Images/lena512.bmp';
-testImage = './Images/peppers512.tiff';
-% testImage = './Images/baboon512.tiff';
+% testImage = './Images/peppers512.tiff';
+testImage = './Images/baboon512.tiff';
 I = imread(testImage);
 I = im2gray(I);
 I = double(I);
@@ -37,10 +33,10 @@ Kmax = 5;
 dmin = 3;
 
 %% Main loop
-RESULTS = zeros((Kmax-dmin+1) * length(vkeep), 6);
+RESULTS = zeros((Kmax) * length(vkeep), 6);
 cont = 0;
 
-for kstep = dmin:Kmax
+for kstep = 3:Kmax
     for keep = vkeep
         cont = cont + 1;
 
@@ -89,6 +85,7 @@ for kstep = dmin:Kmax
                 err       = mseVAL;
                 Ifin      = Iout;
                 theta_fin = theta;
+                kmax = max(lrow,lcol);
             end
         end
 
@@ -108,9 +105,16 @@ for kstep = dmin:Kmax
 end
 
 %% Display results table
+RESULTS_best = zeros(length(vkeep),size(RESULTS,2));
+for i = 1:length(vkeep)
+    I = find(RESULTS(:,1) == vkeep(i));
+    [~,J] = max(RESULTS(I,2));
+    RESULTS_best(i,:) = RESULTS(I(J(1)),:);
+end
+
 varNames = {'CR', 'PSNR', 'SSIM', '\% retained', 'Best $\theta$', 'Decomp'};
 
 disp('***** OUR CASE *****')
-T = array2table(RESULTS, 'VariableNames', varNames);
+T = array2table(RESULTS_best, 'VariableNames', varNames);
 disp(T)
 
