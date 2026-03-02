@@ -1,0 +1,32 @@
+%% Analyze the results
+%%
+load KODAK_OW.mat
+[av_OW, level_OW, kmax_OW] = analyze(RESULTS_GLOBAL, 3);
+
+%%
+load KODAK_VP.mat
+[av_VP, level_VP, kmax_VP] = analyze(RESULTS_GLOBAL, 3);
+
+%%
+load KODAK_db2.mat
+[av_db2, level_db2, kmax_db2] = analyze(RESULTS_GLOBAL, 2);
+
+%%
+load KODAK_bior25.mat
+[av_bior25, level_bior25, kmax_bior25] = analyze(RESULTS_GLOBAL, 2);
+
+%%
+load KODAK_OW.mat
+[av_OW, level_OW, kmax_OW] = analyze(RESULTS_GLOBAL, 3);
+
+%%
+load KODAK_VP.mat
+[av_VP, level_VP, kmax_VP] = analyze(RESULTS_GLOBAL, 3);
+
+%%
+load KODAK_db2.mat
+[av_db2, level_db2, kmax_db2] = analyze(RESULTS_GLOBAL, 2);
+
+%%
+load KODAK_bior25.mat
+[av_bior25, level_bior25, kmax_bior25] = analyze(RESULTS_GLOBAL, 2);

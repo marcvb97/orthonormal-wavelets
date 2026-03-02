@@ -1,0 +1,33 @@
+% Set the directory path
+image_dir = '../URBAN100';
+
+% Get all image files (adjust extensions as needed)
+extensions = {'*.png', '*.jpg', '*.tiff', '*.bmp'};
+files = [];
+for i = 1:length(extensions)
+    files = [files; dir(fullfile(image_dir, extensions{i}))];
+end
+
+% Loop over all images
+for i = 1:length(files)
+    filename = files(i).name;
+    filepath = fullfile(image_dir, filename);
+    disp(filepath)
+    
+    % Read image
+    img = imread(filepath);
+    imshow(img)
+    
+    % Apply your compression algorithm
+    RESULTS_GLOBAL{i} = imagecompression_color_VP(filepath);
+
+    % % Save result (example: save as PNG with a new name)
+    % [~, name, ~] = fileparts(filename);
+    % output_path = fullfile(image_dir, 'output', [name '_compressed.png']);
+    % imwrite(compressed, output_path);
+    % 
+    % fprintf('Processed: %s\n', filename);
+end
+
+%%
+save URBAN100_.mat

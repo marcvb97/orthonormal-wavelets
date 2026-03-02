@@ -1,12 +1,11 @@
+function [RESULTS_GLOBAL] = imagecompression_color_other(filepath)
+
 % AIM: Image compression using custom wavelets.
 % The best result is found by varying theta (see vtheta).
 % Depending on the value of flag, all decomposition coefficients 
 % (wavelet and scaling) are compressed or only the wavelet coefficients.
 % Results are displayed for all possible decomposition steps (see Kmax).
 % initial_transformation indicates if TR2D and ITR2D are used.
-
-close all
-clear all
 
 %% Settings
 flag = 1;   % 0 = compress all coefficients, 1 = compress details only
@@ -17,7 +16,7 @@ vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
 vtheta = [0.0];
 % vtheta = [0.5];
 
-wname='db2';
+% wname='db2';
 wname='bior3.5';
 
 % normalization factors for the 1step transforms
@@ -26,8 +25,10 @@ wname='bior3.5';
 fsca=sqrt(3); fwav=sqrt(3/2);
 
 %% Load and prepare image
-testImage = '../PEXELS300/997704.bmp';
-testImage = '../13US/fig01.png'
+% testImage = '../PEXELS300/997704.bmp';
+% testImage = '../13US/fig01.png';
+% testImage = '../KodakImages/1.png';
+testImage = filepath;
 II = imread(testImage);
 imshow(II)
 R = double(II(:,:,1));
@@ -37,16 +38,19 @@ B = double(II(:,:,3));
 [Nor, Mor] = size(R);
 
 %% Decomposition parameters
-Kmax = 9;
+Kmax = floor(log(min(Nor,Mor))/log(2) + 1.0e-12);
 dmin = 3;
 
 %% Main loop
 RESULTS = zeros((Kmax-4+1) * length(vkeep), 6);
+TIMES   = zeros((Kmax-3+1) * length(vkeep) * length(vtheta), 6);
 cont = 0;
+cont_time = 0;
 
 for kstep = 4:Kmax
     for keep = vkeep
         cont = cont + 1;
+        cont_time = cont_time+1;
 
         %% First theta: initialise error with first vtheta value
         theta = vtheta(1);
@@ -54,9 +58,12 @@ for kstep = 4:Kmax
         AR = R;
         AG = G;
         AB = B;
+	tic;
         [IdecR,SdecR]=wavedec2(AR,kstep,wname);
         [IdecG,SdecG]=wavedec2(AG,kstep,wname);
         [IdecB,SdecB]=wavedec2(AB,kstep,wname);
+	t1 = toc;
+	tic;
         switch threshold_type
             case 1
                 [IcompR, zero_elR] = THR_other(IdecR, SdecR, keep);
@@ -68,6 +75,8 @@ for kstep = 4:Kmax
                     IscalR, IscalG, IscalB, IwavR, IwavG, IwavB, keep, ...
                     lrow, lcol, flag);
         end
+	t2 = toc;
+	tic;
         IrecR = waverec2(IcompR, SdecR, wname);
         IrecG = waverec2(IcompG, SdecG, wname);
         IrecB = waverec2(IcompB, SdecB, wname);
@@ -75,6 +84,7 @@ for kstep = 4:Kmax
         IoutR = IrecR(1:Nor, 1:Mor);
         IoutG = IrecG(1:Nor, 1:Mor);
         IoutB = IrecB(1:Nor, 1:Mor);
+	t3 = toc;
         DR    = abs(double(R) - double(IoutR)).^2;
         DG    = abs(double(G) - double(IoutG)).^2;
         DB    = abs(double(B) - double(IoutB)).^2;
@@ -86,15 +96,23 @@ for kstep = 4:Kmax
         Ifin      = cat(3, Rfin, Gfin, Bfin);
         theta_fin = theta;
         kmax      = kstep;
+        TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3];
 
         %% Quality metrics
+        disp(filepath)
         psnrVAL = 10 * log10(255^2 / err);
         SSIMVAL  = (ssim(R, Rfin)+ssim(G, Gfin)+ssim(B, Bfin))/3;
 
         num = 3*length([IcompR]);
 
-        RESULTS(cont, :) = [keep, psnrVAL, SSIMVAL, (num - zero_el)*100/(3*Nor*Mor), theta_fin, kmax]
-
+        if psnrVAL < 300.0
+            RESULTS(cont, :) = [keep, psnrVAL, SSIMVAL, (num - zero_el)*100/(3*Nor*Mor), theta_fin, kmax]
+        else
+            disp("psnrVAL > 300")
+            pause
+            cont = cont - 1;
+            cont_time = cont_time - 1;
+        end
         figure(cont)
         imshow(uint8(Ifin))
         axis off equal
@@ -114,3 +132,14 @@ varNames = {'CR', 'PSNR', 'SSIM', '\% retained', 'Best $\theta$', 'Decomp'};
 disp('***** OUR CASE *****')
 T = array2table(RESULTS_best, 'VariableNames', varNames);
 disp(T)
+
+%% RESULTS_GLOBAL
+RESULTS_GLOBAL = struct;
+RESULTS_GLOBAL.name = filepath;
+RESULTS_GLOBAL.RESULTS = RESULTS;
+RESULTS_GLOBAL.RESULTS_best = RESULTS_best;
+RESULTS_GLOBAL.TIMES = TIMES;
+RESULTS_GLOBAL.size = [Nor, Mor];
+
+end
+
