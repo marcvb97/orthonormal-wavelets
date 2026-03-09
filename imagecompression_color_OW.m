@@ -13,9 +13,9 @@ threshold_type = 1; % 1 = separately, 2 = combined over the channels
 initial_transformation = true;
 
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
-% vkeep  = [0.5];
+vkeep  = [0.5];
 vtheta = [0.1:0.1:0.9];
-% vtheta = [0.5];
+vtheta = [0.5];
 
 %% Load and prepare image
 % testImage = '../PEXELS300/997704.bmp';
@@ -32,16 +32,17 @@ B = double(II(:,:,3));
 
 %% Decomposition parameters
 Kmax = floor(log(min(Nor, Mor))/log(3) + 1.0e-12);
-Kmax = min(Kmax, 5);
+% Kmax = min(Kmax, 5);
+Kmax = 4;
 dmin = 3;
 
 %% Main loop
 RESULTS = zeros((Kmax-3+1) * length(vkeep), 6);
-TIMES   = zeros((Kmax-3+1) * length(vkeep) * length(vtheta), 6);
+TIMES   = zeros((Kmax-3+1) * length(vkeep) * length(vtheta), 7);
 cont = 0;
 cont_time = 0;
 
-for kstep = 3:Kmax
+for kstep = 4:Kmax
     for keep = vkeep
         cont = cont + 1;
         cont_time = cont_time+1;
@@ -101,7 +102,7 @@ for kstep = 3:Kmax
         Ifin      = cat(3, Rfin, Gfin, Bfin);
         theta_fin = theta;
         kmax      = max(lrow, lcol);
-        TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3];
+        TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3, err];
 
 
         %% Search remaining theta values for minimum MSE
@@ -162,7 +163,7 @@ for kstep = 3:Kmax
                 theta_fin = theta;
                 kmax      = max(lrow, lcol);
             end
-            TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3];
+            TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3, mseVAL];
         end
 
         %% Quality metrics

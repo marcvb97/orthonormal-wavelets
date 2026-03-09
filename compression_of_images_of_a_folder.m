@@ -10,7 +10,8 @@ for i = 1:length(extensions)
 end
 
 % Loop over all images
-for i = 1:9   % length(files)
+ii = 0;
+for i = 1:length(files)
     filename = files(i).name;
     filepath = fullfile(image_dir, filename);
     disp(filepath)
@@ -20,7 +21,11 @@ for i = 1:9   % length(files)
     imshow(img)
     
     % Apply your compression algorithm
-    RESULTS_GLOBAL{i} = imagecompression_color_other(filepath);
+    for k = 1:1
+        k
+        ii = ii+1;
+        RESULTS_GLOBAL{ii} = imagecompression_color_OW_par(filepath);
+    end
 
     % % Save result (example: save as PNG with a new name)
     % [~, name, ~] = fileparts(filename);
@@ -31,4 +36,4 @@ for i = 1:9   % length(files)
 end
 
 %%
-save URBAN100_bior35.mat
+% save RANDOM_OW_par2.mat

@@ -1,5 +1,6 @@
+
 % Set the directory path
-image_dir = '../URBAN100';
+image_dir = '../RANDOM';
 
 % Get all image files (adjust extensions as needed)
 extensions = {'*.png', '*.jpg', '*.tiff', '*.bmp'};
@@ -9,6 +10,7 @@ for i = 1:length(extensions)
 end
 
 % Loop over all images
+ii = 0;
 for i = 1:length(files)
     filename = files(i).name;
     filepath = fullfile(image_dir, filename);
@@ -19,7 +21,10 @@ for i = 1:length(files)
     imshow(img)
     
     % Apply your compression algorithm
-    RESULTS_GLOBAL{i} = imagecompression_color_VP(filepath);
+    for k = 1:1
+        ii = ii+1;
+        RESULTS_GLOBAL{ii} = imagecompression_color_other(filepath);
+    end
 
     % % Save result (example: save as PNG with a new name)
     % [~, name, ~] = fileparts(filename);
@@ -30,4 +35,4 @@ for i = 1:length(files)
 end
 
 %%
-save URBAN100_.mat
+% save URBAN100_bior35.mat

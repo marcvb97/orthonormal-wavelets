@@ -12,12 +12,12 @@ flag = 1;   % 0 = compress all coefficients, 1 = compress details only
 threshold_type = 1; % 1 = separately, 2 = combined over the channels
 
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
-% vkeep  = [0.5];
+vkeep  = [0.5];
 vtheta = [0.0];
 % vtheta = [0.5];
 
-% wname='db2';
-wname='bior3.5';
+wname='db2';
+% wname='bior3.5';
 
 % normalization factors for the 1step transforms
 % NB in decomposing we multiply the output by these factors
@@ -39,11 +39,12 @@ B = double(II(:,:,3));
 
 %% Decomposition parameters
 Kmax = floor(log(min(Nor,Mor))/log(2) + 1.0e-12);
+Kmax = 4;
 dmin = 3;
 
 %% Main loop
 RESULTS = zeros((Kmax-4+1) * length(vkeep), 6);
-TIMES   = zeros((Kmax-3+1) * length(vkeep) * length(vtheta), 6);
+TIMES   = zeros((Kmax-4+1) * length(vkeep) * length(vtheta), 7);
 cont = 0;
 cont_time = 0;
 
@@ -64,11 +65,13 @@ for kstep = 4:Kmax
         [IdecB,SdecB]=wavedec2(AB,kstep,wname);
 	t1 = toc;
 	tic;
+        num_keep = keep*Nor*Mor;
+        keep2 = num_keep / length(IdecR);
         switch threshold_type
             case 1
-                [IcompR, zero_elR] = THR_other(IdecR, SdecR, keep);
-                [IcompG, zero_elG] = THR_other(IdecG, SdecG, keep);
-                [IcompB, zero_elB] = THR_other(IdecB, SdecB, keep);
+                [IcompR, zero_elR] = THR_other(IdecR, SdecR, keep2,flag);
+                [IcompG, zero_elG] = THR_other(IdecG, SdecG, keep2,flag);
+                [IcompB, zero_elB] = THR_other(IdecB, SdecB, keep2,flag);
                 zero_el = zero_elR + zero_elG + zero_elB;
             case 2
                 [thr, zero_el, IcompR, IcompG, IcompB] = THR_color(IdecR, IdecG, IdecB,...
@@ -96,7 +99,7 @@ for kstep = 4:Kmax
         Ifin      = cat(3, Rfin, Gfin, Bfin);
         theta_fin = theta;
         kmax      = kstep;
-        TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3];
+        TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3, err];
 
         %% Quality metrics
         disp(filepath)
@@ -105,17 +108,17 @@ for kstep = 4:Kmax
 
         num = 3*length([IcompR]);
 
-        if psnrVAL < 300.0
+        if (num - zero_el)*100/(3*Nor*Mor) < 70
             RESULTS(cont, :) = [keep, psnrVAL, SSIMVAL, (num - zero_el)*100/(3*Nor*Mor), theta_fin, kmax]
+            figure(cont)
+            imshow(uint8(Ifin))
+            axis off equal
         else
-            disp("psnrVAL > 300")
-            pause
+            disp("percentage retained >= 70%")
             cont = cont - 1;
             cont_time = cont_time - 1;
         end
-        figure(cont)
-        imshow(uint8(Ifin))
-        axis off equal
+
     end
 end
 

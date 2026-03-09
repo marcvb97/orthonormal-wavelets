@@ -23,7 +23,6 @@ A    = Adec{kmax};
 
 %% Inverse reconstruction loop (coarsest to finest)
 for k = kmax:-1:1
-
     B      = Adec{k};
     [N, M] = size(B);
 
@@ -42,9 +41,10 @@ for k = kmax:-1:1
     % Overwrite the scaling block with the reconstructed approximation
     B(1:n, 1:m) = A(1:n, 1:m);
 
-    %-- Inverse row transform --%
+    %-- Inverse row transform (parallelized over rows) --%
     if k <= lrow
         trow = theta;
+        At   = B;                          % pre-allocate: gives parfor a sliced output variable
         for i = 1:N
             [At(i, 1:M), ~] = IFT1step_m(B(i, 1:m).', B(i, m+1:M).', trow);
         end
@@ -52,17 +52,18 @@ for k = kmax:-1:1
         At = B;
     end
 
-    %-- Inverse column transform --%
+    %-- Inverse column transform (parallelized over columns) --%
     if k <= lcol
-        tcol = theta;
+        tcol  = theta;
+        Atout = At;                        % pre-allocate: gives parfor a sliced output variable
         for j = 1:M
-            [At(1:N, j), ~] = IFT1step_m(At(1:n, j), At(n+1:N, j), tcol);
+            [Atout(1:N, j), ~] = IFT1step_m(At(1:n, j), At(n+1:N, j), tcol);
         end
+        At = Atout;                        % commit result back so A = At is always defined
     end
 
     A = At;
 end
 
 Arec = A;
-
 end
