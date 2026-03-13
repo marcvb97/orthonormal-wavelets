@@ -121,15 +121,25 @@ load NY17_bior35.mat
 
 %%
 clf
+set(0, 'DefaultAxesFontSize', 16);    % Axes labels & ticks
+set(0, 'DefaultTextFontSize', 16);    % Text & titles
+set(0, 'DefaultLineLineWidth', 2);  % All future plots will use linewidth = 2
+set(0, 'DefaultLineMarkerSize', 10);
+set(0, 'DefaultLegendFontSize', 16);
+
+%%
+clf
 semilogx(av_OW(:,1),av_OW(:,2),'-o')
 hold on
 semilogx(av_OW2(:,1),av_OW2(:,2),'-^')
 semilogx(av_VP(:,1),av_VP(:,2),'-x')
 semilogx(av_db2(:,1),av_db2(:,2),'-+')
 semilogx(av_bior35(:,1),av_bior35(:,2),'-v')
-xlabel("percentage")
-ylabel("average PSNR")
-legend("OW","OW2","VP","DB2","BIOR3.5","Location","northwest")
+title('KODAK','Interpreter','latex')
+xlabel("percentage",'Interpreter', 'latex')
+ylabel("average PSNR",'Interpreter', 'latex')
+legend("OVP","OVP2","IVP","DB2","BIOR3.5","Location","northwest",'Interpreter', 'latex')
+saveas(1,'figs/fig_KODAK_PSNR.eps','epsc')
 
 %%
 clf
@@ -139,9 +149,11 @@ semilogx(av_OW2(:,1),av_OW2(:,3),'-^')
 semilogx(av_VP(:,1),av_VP(:,3),'-x')
 semilogx(av_db2(:,1),av_db2(:,3),'-+')
 semilogx(av_bior35(:,1),av_bior35(:,3),'-v')
-xlabel("percentage")
-ylabel("average SSIM")
-legend("OW","OW2","VP","DB2","BIOR3.5","Location","northwest")
+title('KODAK','Interpreter','latex')
+xlabel("percentage",'Interpreter', 'latex')
+ylabel("average SSSIM",'Interpreter', 'latex')
+legend("OVP","OVP2","IVP","DB2","BIOR3.5","Location","northwest",'Interpreter', 'latex')
+saveas(1,'figs/fig_KODAK_SSIM.eps','epsc')
 
 %%
 clf
@@ -151,9 +163,11 @@ semilogx(av_OW2(:,1),av_OW2(:,6),'-^')
 semilogx(av_VP(:,1),av_VP(:,6),'-x')
 semilogx(av_db2(:,1),av_db2(:,6),'-+')
 semilogx(av_bior35(:,1),av_bior35(:,6),'-v')
-xlabel("percentage")
-ylabel("average level")
-legend("OW","OW2","VP","DB2","BIOR3.5","Location","northwest")
+title('KODAK','Interpreter','latex')
+xlabel("percentage",'Interpreter', 'latex')
+ylabel("average level",'Interpreter', 'latex')
+legend("OVP","OVP2","IVP","DB2","BIOR3.5","Location","northwest",'Interpreter', 'latex')
+saveas(1,'figs/fig_KODAK_level.eps','epsc')
 
 %%
 clf
@@ -161,6 +175,10 @@ semilogx(av_OW(:,1),av_OW(:,5),'-o')
 hold on
 semilogx(av_OW2(:,1),av_OW2(:,5),'-^')
 semilogx(av_VP(:,1),av_VP(:,5),'-x')
-xlabel("percentage")
-ylabel("average theta")
-legend("OW","OW2","VP","Location","northwest")
+title('KODAK','Interpreter','latex')
+xlabel("percentage",'Interpreter', 'latex')
+ylabel("average $\theta$",'Interpreter', 'latex')
+legend("OVP","OVP2","IVP","Location","northwest",'Interpreter', 'latex')
+saveas(1,'figs/fig_KODAK_theta.eps','epsc')
+
+%%

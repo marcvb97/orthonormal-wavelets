@@ -24,7 +24,7 @@ for i = 1:length(files)
     for k = 1:1
         k
         ii = ii+1;
-        RESULTS_GLOBAL{ii} = imagecompression_color_OW_par(filepath);
+        RESULTS_GLOBAL{ii} = imagecompression_color_OW(filepath);
     end
 
     % % Save result (example: save as PNG with a new name)
@@ -36,4 +36,4 @@ for i = 1:length(files)
 end
 
 %%
-% save RANDOM_OW_par2.mat
+save URBAN100_OW2.mat

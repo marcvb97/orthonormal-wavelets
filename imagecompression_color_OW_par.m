@@ -11,10 +11,10 @@ function [RESULTS_GLOBAL] = imagecompression_color_OW_par(filepath)
 %% Settings
 flag = 1;   % 0 = compress all coefficients, 1 = compress details only
 threshold_type = 1; % 1 = separately, 2 = combined over the channels
-initial_transformation = false;
+initial_transformation = true;
 
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
-vkeep  = [0.5];
+% vkeep  = [0.5];
 vtheta = [0.1:0.1:0.9];
 vtheta = [0.5];
 

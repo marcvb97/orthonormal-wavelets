@@ -10,12 +10,12 @@ function [RESULTS_GLOBAL] = imagecompression_color_OW(filepath)
 %% Settings
 flag = 1;   % 0 = compress all coefficients, 1 = compress details only
 threshold_type = 1; % 1 = separately, 2 = combined over the channels
-initial_transformation = true;
+initial_transformation = false;
 
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
-vkeep  = [0.5];
+% vkeep  = [0.5];
 vtheta = [0.1:0.1:0.9];
-vtheta = [0.5];
+% vtheta = [0.5];
 
 %% Load and prepare image
 % testImage = '../PEXELS300/997704.bmp';
@@ -33,7 +33,7 @@ B = double(II(:,:,3));
 %% Decomposition parameters
 Kmax = floor(log(min(Nor, Mor))/log(3) + 1.0e-12);
 % Kmax = min(Kmax, 5);
-Kmax = 4;
+% Kmax = 4;
 dmin = 3;
 
 %% Main loop
@@ -42,7 +42,7 @@ TIMES   = zeros((Kmax-3+1) * length(vkeep) * length(vtheta), 7);
 cont = 0;
 cont_time = 0;
 
-for kstep = 4:Kmax
+for kstep = 3:Kmax
     for keep = vkeep
         cont = cont + 1;
         cont_time = cont_time+1;
@@ -163,6 +163,7 @@ for kstep = 4:Kmax
                 theta_fin = theta;
                 kmax      = max(lrow, lcol);
             end
+            
             TIMES(cont_time,:) = [kstep, keep, theta, t1, t2, t3, mseVAL];
         end
 
