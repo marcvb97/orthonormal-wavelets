@@ -1,6 +1,0 @@
-%% what levels and theta values are present in RESULTS_GLOBAL
-level_min = ;
-for i = 1:length(RESULTS_GLOBAL)
-    RES = RESULTS_GLOBAL{i}.RESULTS;
-    level_min = min(level_min,RES(:,6).')
-end
