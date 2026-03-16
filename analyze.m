@@ -1,4 +1,5 @@
 function [av, level, kmax] = analyze(res, factor)
+fprintf("number of images: %i\n",length(res))
 RESULTS_best = res{1}.RESULTS_best;
 [m,~] =size(RESULTS_best);
 av = RESULTS_best;

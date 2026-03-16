@@ -1,301 +1,345 @@
-# Orthonormal Wavelets — Image & Tensor Compression Toolbox
+# Orthonormal Wavelets — MATLAB Toolbox
 
-A MATLAB toolbox for image and video compression using custom orthonormal wavelets. The toolbox supports two wavelet families (**OW** and **VP**), operates on both 2D colour images and 3D tensors (e.g. grayscale video), and includes baseline comparisons against MATLAB's built-in `wavedec2`/`wavedec3`.
+This toolbox implements a family of custom orthonormal wavelets and applies them to image and video compression. The core idea is a **base-3 subsampling** scheme: each decomposition step splits N coefficients into N/3 scaling (approximation) coefficients and 2N/3 wavelet (detail) coefficients. This contrasts with classical dyadic wavelets (Daubechies, biorthogonal), which use a 1:2 split.
 
----
+The localization and smoothness of the wavelets are tuned by a parameter `theta ∈ (0, 1)`, which controls the overlap degree `m`. Two main transform variants are provided throughout the toolbox:
 
-## Table of Contents
+- **OW** — the base orthonormal wavelet transform
+- **VP** — a normalized variant with explicit scaling factors `fsca = sqrt(3)` and `fwav = sqrt(3/2)`
 
-- [Overview](#overview)
-- [Wavelet Families](#wavelet-families)
-- [File Structure](#file-structure)
-- [Quick Start](#quick-start)
-- [Function Reference](#function-reference)
-  - [1-D Building Blocks](#1-d-building-blocks)
-  - [2-D Forward & Inverse Transforms](#2-d-forward--inverse-transforms)
-  - [3-D Forward & Inverse Transforms](#3-d-forward--inverse-transforms)
-  - [Decomposition Wrappers](#decomposition-wrappers)
-  - [Image Compression — 2D Colour](#image-compression--2d-colour)
-  - [Tensor Compression — 3D](#tensor-compression--3d)
-  - [Utility & Analysis](#utility--analysis)
-- [Key Parameters](#key-parameters)
-- [Output Structure](#output-structure)
-- [Requirements](#requirements)
+Both variants are available for 1D signals, 2D images, and 3D tensors (e.g., video or image stacks). Compression is achieved by thresholding the smallest wavelet coefficients and retaining only a fraction `keep` of the total.
 
 ---
 
-## Overview
+## Quickstart
 
-The toolbox implements a custom wavelet transform built on a **base-3 multiresolution analysis**: each decomposition step splits a signal of length `N = 3n` into `n` scaling coefficients and `2n` wavelet coefficients. The localization degree is controlled by the parameter `theta`, which is optimised automatically by searching over a grid of values.
+### Grayscale image compression
 
-Compression is achieved by **hard thresholding**: a fraction `keep` of the largest-magnitude coefficients is retained and the rest are set to zero. Quality is evaluated with PSNR and SSIM.
+```matlab
+% Load and prepare image
+I = double(im2gray(imread('./Images/lena512.bmp')));
+
+theta = 0.5;   % localization parameter in (0, 1)
+kstep = 4;     % number of decomposition levels
+dmin  = 3;     % minimum subband size
+keep  = 0.05;  % retain 5% of coefficients
+flag  = 1;     % 1 = threshold wavelet only, 0 = threshold everything
+
+% Forward transform + threshold + inverse
+[Idec, Iscal, Iwav, lrow, lcol] = DEC(I, theta, kstep, dmin);
+[~, ~, Icomp]                   = THR(Idec, Iscal, Iwav, keep, lrow, lcol, flag);
+Irec = IFWTmatrix_m(Icomp, lrow, lcol, theta);
+Irec = Irec(1:size(I,1), 1:size(I,2));
+
+mse = mean((I(:) - Irec(:)).^2);
+fprintf('MSE = %.4f,  PSNR = %.2f dB\n', mse, 10*log10(255^2/mse));
+```
+
+### Color image compression (sweep over theta)
+
+```matlab
+% Run the full OW color pipeline on any image file;
+% returns MSE/PSNR/SSIM for all (theta, keep, level) combinations
+RESULTS = imagecompression_color_OW('path/to/image.png');
+```
+
+### 3D tensor / video compression (VP pipeline)
+
+```matlab
+% Accepts a .mat file (variable I of size N x M x P)
+% or a folder of grayscale PNG/BMP frames
+[RESULTS, Ifin] = imagecompression_tensor_VP('path/to/movie.mat');
+```
+
+### Batch processing over a folder of images
+
+```matlab
+% Sequential
+compression_of_images_of_a_folder;   % edit image_dir inside the script
+
+% Parallel (uses parfor)
+compression_of_images_of_a_folder_par;
+```
 
 ---
 
-## Wavelet Families
-
-| Family | Description | Key files |
-|--------|-------------|-----------|
-| **OW** (Orthonormal Wavelets) | Custom orthonormal wavelets with optional initial spectral transformation (`TR2D`/`TR3D`) | `FT1step_m.m`, `IFT1step_m.m`, `FWTmatrix1_m.m`, `IFWTmatrix_m.m` |
-| **VP** (VP Wavelets) | Custom wavelets with explicit normalization factors `fsca` and `fwav` | `FWT1step_m_VP.m`, `IFWT1step_m_VP.m`, `FWTmatrix1_m_VP.m`, `IFWTmatrix_m_VP.m` |
-| **wavedec3** (baseline) | MATLAB built-in 3-D wavelet via `wavedec3`/`waverec3` | `imagecompression_tensor_wavedec3.m` |
-
----
-
-## File Structure
+## Repository Structure
 
 ```
 orthonormal_wavelets/
-│
-├── 1-D transforms
-│   ├── FT1step_m.m                   OW  forward 1-D one-step transform
-│   ├── FT1step_m_fast.m              OW  forward 1-D one-step transform (optimised)
-│   ├── IFT1step_m.m                  OW  inverse 1-D one-step transform
-│   ├── FWT1step_m_VP.m               VP  forward 1-D one-step transform
-│   ├── FWT1step_m_VP_fast.m          VP  forward 1-D one-step transform (optimised)
-│   └── IFWT1step_m_VP.m              VP  inverse 1-D one-step transform
-│
-├── 2-D transforms
-│   ├── FWTmatrix1_m.m                OW  multi-level 2-D forward transform
-│   ├── FWTmatrix1_m_VP.m             VP  multi-level 2-D forward transform
-│   ├── IFWTmatrix_m.m                OW  multi-level 2-D inverse transform
-│   ├── IFWTmatrix_m_VP.m             VP  multi-level 2-D inverse transform
-│   └── IFWTmatrix_m_old.m            (legacy version)
-│
-├── 3-D transforms
-│   ├── FWTmatrix3D_m.m               OW  multi-level 3-D forward transform
-│   ├── FWTtensor1_m_VP.m             VP  multi-level 3-D forward transform
-│   ├── IFWTmatrix3D_m.m              OW  multi-level 3-D inverse transform
-│   └── IFWTtensor_m_VP.m             VP  multi-level 3-D inverse transform
-│
-├── Decomposition wrappers (pad + transform + split coeff.)
-│   ├── DEC.m                         OW  2-D decomposition wrapper
-│   ├── DEC_new.m                     OW  2-D decomposition wrapper (with TR2D option)
-│   ├── DEC_VP.m                      VP  2-D decomposition wrapper
-│   ├── DEC_3D.m                      OW  3-D decomposition wrapper
-│   ├── DEC3D.m                       OW  3-D decomposition wrapper (clean version)
-│   └── DEC3D_VP.m                    VP  3-D decomposition wrapper
-│
-├── Initial spectral transformations
-│   ├── ITR1D.m                       Inverse spectral transform (1-D)
-│   ├── ITR2D.m                       Inverse spectral transform (2-D)
-│   ├── ITR3D.m                       Inverse spectral transform (3-D)
-│   └── compute_nu.m                  Compute nu weights for spectral transform
-│
-├── Image compression — 2-D colour
-│   ├── imagecompression.m            Basic grayscale compression script
-│   ├── imagecompression_color_OW.m   OW  colour image compression
-│   ├── imagecompression_color_OW_par.m     OW  (parallelised R/G/B)
-│   ├── imagecompression_color_OW_new.m     OW  with initial TR2D transformation
-│   ├── imagecompression_color_OW_new_par.m OW  new + parallelised
-│   ├── imagecompression_color_OW_PSNR_SSIM.m  OW  dual optimisation (MSE + SSIM)
-│   ├── imagecompression_color_VP.m   VP  colour image compression
-│   ├── imagecompression_color_VP_par.m     VP  (parallelised R/G/B)
-│   ├── imagecompression_color_other.m      Baseline: db2 / bior3.5 via wavedec2
-│   └── imagecompression_color_other_PSNR_SSIM.m  Baseline with dual optimisation
-│
-├── Tensor compression — 3-D
-│   ├── imagecompression_tensor_OW.m        OW  tensor compression
-│   ├── imagecompression_tensor_VP.m        VP  tensor compression
-│   └── imagecompression_tensor_wavedec3.m  Baseline: MATLAB wavedec3
-│
-├── Batch processing & analysis
-│   ├── compression_of_images_of_a_folder.m      Compress all images in a folder
-│   ├── compression_of_images_of_a_folder_par.m  Same, parallelised
-│   ├── analyze.m                     Average RESULTS_best over multiple images
-│   ├── analyze_PSNR_SSIM.m           Average results (PSNR+SSIM variant)
-│   ├── analyze_results.m             Script: load .mat files and compare methods
-│   ├── analyze_timings.m             Compute average timing by image size
-│   ├── main_analyze_timings.m        Script: run timing analysis
-│   └── check_RESULTS_GLOBAL.m        Inspect theta/level distribution in results
-│
-└── Data utilities
-    ├── convert_video_to_tensor.m     Read a video file into a 3-D grayscale tensor
-    └── generate_grayscale_video.m    Generate a synthetic uncompressed grayscale video
-    └── generate_random_images.m      Generate random PNG images of various sizes
+├── Images/                  Test images (lena512, peppers512, baboon512)
+├── FT1step_m.m              Core 1D forward transform step
+├── IFT1step_m.m             Core 1D inverse transform step
+├── FWTmatrix1_m.m           Multi-level 2D forward transform
+├── IFWTmatrix_m.m           Multi-level 2D inverse transform
+├── DEC.m                    High-level 2D decomposition
+├── THR.m                    Wavelet coefficient thresholding
+├── imagecompression*.m      Compression pipelines (color, tensor, baselines)
+└── ...                      (see full file list below)
 ```
 
 ---
 
-## Quick Start
+## File Reference
 
-### Compress a single colour image (VP wavelets)
+### Core 1D Transform Steps
 
-```matlab
-[RESULTS_GLOBAL] = imagecompression_color_VP('path/to/image.png');
+The entire library builds on two primitive 1D functions. Each handles a single decomposition or reconstruction step on a vector of arbitrary length, padding to the nearest multiple of 3 as needed.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `FT1step_m.m` | Forward step: maps a length-N vector to N/3 scaling + 2N/3 wavelet coefficients. | — |
+| `FT1step_m_fast.m` | Vectorized, optimized version of `FT1step_m`. | — |
+| `IFT1step_m.m` | Inverse step: reconstructs the original vector from scaling and wavelet coefficients. | — |
+| `FWT1step_m_VP.m` | Forward step, VP variant — applies normalization factors `fsca` and `fwav`. | — |
+| `FWT1step_m_VP_fast.m` | Vectorized version of `FWT1step_m_VP`. | — |
+| `FWT1step_m_VP_old.m` | Legacy version of `FWT1step_m_VP`, kept for reference. | `FWT1step_m_VP` |
+| `IFWT1step_m_VP.m` | Inverse VP step corresponding to `FWT1step_m_VP`. | — |
+
+### Multi-Level 2D Transforms
+
+These iterate the 1D step along rows and columns of a matrix up to `kmax` times, stopping when the approximation submatrix shrinks below `dmin`.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `FWTmatrix1_m.m` | Multi-level 2D forward transform (OW). Returns cell array `Adec`. | `FT1step_m` |
+| `FWTmatrix1_m_VP.m` | Multi-level 2D forward transform (VP). | `FWT1step_m_VP` |
+| `IFWTmatrix_m.m` | Multi-level 2D inverse transform (OW). | `IFT1step_m` |
+| `IFWTmatrix_m_VP.m` | Multi-level 2D inverse transform (VP). | `IFWT1step_m_VP` |
+| `IFWTmatrix_m_old.m` | Legacy version of `IFWTmatrix_m`. | `IFT1step_m`, `IFWTmatrix_m` |
+
+### 2D Decomposition / Reconstruction (High-Level)
+
+These wrap the multi-level transforms with padding logic and extract flat coefficient vectors `Iscal` and `Iwav` for easy thresholding.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `DEC.m` | Pads image to multiple of 3, decomposes, returns `Iscal` and `Iwav`. | `FWTmatrix1_m` |
+| `DEC_VP.m` | VP-normalized variant of `DEC`. | `FWTmatrix1_m_VP` |
+| `DEC_new.m` | Like `DEC`, but optionally applies a `TR2D` pre-transform first. | `FWTmatrix1_m`, `TR2D` |
+| `REC_new.m` | Inverse of `DEC_new`; optionally applies `ITR2D` post-transform. | `IFT1step_m`, `ITR2D` |
+
+### 3D (Tensor) Transforms
+
+All 3D functions extend their 2D counterparts by applying the 1D step along a third axis (slices). They support video tensors stored as `.mat` files or folders of frames.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `FWTmatrix3D_m.m` | Multi-level 3D forward transform (OW). | `FT1step_m` |
+| `FWTtensor1_m_VP.m` | Multi-level 3D forward transform (VP). | `FWT1step_m_VP` |
+| `IFWTmatrix3D_m.m` | Multi-level 3D inverse transform (OW). | `IFT1step_m` |
+| `IFWTtensor_m_VP.m` | Multi-level 3D inverse transform (VP). | `IFWT1step_m_VP` |
+| `DEC3D.m` | High-level 3D decomposition (OW). | `FWTmatrix3D_m` |
+| `DEC3D_VP.m` | High-level 3D decomposition (VP). | `FWTtensor1_m_VP` |
+| `DEC_3D.m` | Alternative 3D decomposition treating slices independently. | `FWTmatrix1_m` |
+
+### Thresholding
+
+Thresholding is how compression is achieved: coefficients below a threshold are zeroed, retaining only a `keep` fraction of the total.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `THR.m` | Thresholds 2D wavelet coefficients. `flag=0`: all coefficients; `flag=1`: wavelet only. | — |
+| `THR3D.m` | 3D version of `THR`. | — |
+| `THR3D_VP.m` | VP-normalized 3D thresholding. | `THR` |
+| `THR_other.m` | Thresholding for MATLAB built-in `wavedec`/`wavedec2` output (baseline comparisons). | — |
+
+### Auxiliary DCT-based Transform (TR / ITR)
+
+Some compression variants apply a DCT-based change of basis before the wavelet transform to improve energy compaction. `TR2D` and `ITR2D` are invertible and self-contained.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `compute_nu.m` | Computes the weight vector `nu(r)` controlling the TR reweighting. | — |
+| `TR1D.m` | 1D forward TR transform (DCT-domain reweighting). | — |
+| `ITR1D.m` | Inverse of `TR1D`. | — |
+| `TR2D.m` | 2D forward TR transform (rows then columns). | `TR1D`, `compute_nu` |
+| `ITR2D.m` | Inverse of `TR2D`. | `ITR1D`, `compute_nu` |
+| `TR3D.m` | 3D forward TR transform. | `TR1D`, `compute_nu` |
+| `ITR3D.m` | Inverse of `TR3D`. | `ITR1D`, `compute_nu` |
+
+### Compression Pipelines
+
+#### Grayscale
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `imagecompression.m` | Script: sweeps `theta` and `keep`, reports MSE for each combination. | `DEC`, `IFWTmatrix_m`, `ITR2D`, `THR`, `TR2D` |
+| `our_imagecompression.m` | Like `imagecompression.m` but uses the VP pipeline. | `DEC`, `IFWTmatrix_m`, `THR` |
+
+#### Color (R/G/B channels processed independently)
+
+All functions below accept a file path and return a `RESULTS_GLOBAL` struct with MSE, PSNR, SSIM, and timings for each `(theta, keep, level)` combination.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `imagecompression_color_OW.m` | OW pipeline, RGB. | `DEC`, `IFWTmatrix_m`, `ITR2D`, `THR`, `TR2D` |
+| `imagecompression_color_OW_par.m` | OW pipeline, RGB, parallelized over channels. | `DEC`, `IFWTmatrix_m`, `ITR2D`, `THR`, `TR2D` |
+| `imagecompression_color_OW_new.m` | OW pipeline with TR2D pre-transform. | `DEC_new`, `REC_new`, `THR` |
+| `imagecompression_color_OW_new_par.m` | Parallel version of `imagecompression_color_OW_new`. | `DEC_new`, `REC_new`, `THR` |
+| `imagecompression_color_OW_PSNR_SSIM.m` | OW pipeline, optimizes independently for MSE and SSIM. | `DEC`, `IFWTmatrix_m`, `ITR2D`, `THR`, `TR2D` |
+| `imagecompression_color_OW_YCbCr.m` | OW pipeline, YCbCr color space. | `DEC`, `IFWTmatrix_m`, `ITR2D`, `THR`, `TR2D` |
+| `imagecompression_color_VP.m` | VP pipeline, RGB. | `DEC_VP`, `IFWTmatrix_m_VP`, `THR` |
+| `imagecompression_color_VP_par.m` | VP pipeline, RGB, parallelized. | `DEC_VP`, `IFWTmatrix_m_VP`, `THR` |
+| `imagecompression_color_VP_YCbCr.m` | VP pipeline, YCbCr color space. | `DEC_VP`, `IFWTmatrix_m_VP`, `THR` |
+| `imagecompression_color_other.m` | Baseline using MATLAB `wavedec2` (e.g., `db2`, `bior3.5`). | `THR_other` |
+| `imagecompression_color_other_PSNR_SSIM.m` | Baseline with independent MSE/SSIM optimization. | `THR_other` |
+| `imagecompression_color_other_YCbCr.m` | Baseline in YCbCr color space. | `THR_other` |
+
+#### Tensor / Video
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `imagecompression_tensor_OW.m` | OW pipeline on a 3D tensor. Accepts `.mat` or folder of frames. | `DEC3D`, `IFWTmatrix3D_m`, `ITR3D`, `THR3D`, `TR3D` |
+| `imagecompression_tensor_VP.m` | VP pipeline on a 3D tensor. | `DEC3D_VP`, `IFWTtensor_m_VP`, `THR3D_VP` |
+| `imagecompression_tensor_wavedec3.m` | Baseline using MATLAB `wavedec3`/`waverec3`. | — |
+
+### Batch Processing
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `compression_of_images_of_a_folder.m` | Runs `imagecompression_color_OW_YCbCr` on every image in a directory. | `imagecompression_color_OW_YCbCr` |
+| `compression_of_images_of_a_folder_par.m` | Same, parallelized over images with `parfor`. | `imagecompression_color_OW_par` |
+
+### Analysis and Visualization
+
+After running compression experiments, results are saved to `.mat` files and analyzed with these functions.
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `analyze.m` | Averages MSE results across a set of images. | — |
+| `analyze_PSNR_SSIM.m` | Same but for PSNR/SSIM-optimized results. | — |
+| `analyze_timings.m` | Extracts and averages timing data by image size. | — |
+| `main_analyze_timings.m` | Loads multiple result files and plots timing comparisons. | `analyze_timings` |
+| `check_RESULTS_GLOBAL.m` | Diagnostic: reports level range and `theta` distribution in a results struct. | — |
+| `run_analysis.m` | Loads OW, VP, and baseline results and plots comparative MSE curves. | `analyze` |
+| `run_analysis_YCbCr.m` | Same as `run_analysis.m` for YCbCr results. | `analyze` |
+| `PSNR_in_function_of_theta_and_level.m` | Plots PSNR vs. `theta` and decomposition level. | — |
+
+### Utilities and Data Generation
+
+| File | Description | Local Dependencies |
+|------|-------------|--------------------|
+| `generate_random_images.m` | Generates random RGB test images of sizes `2^4` to `2^max_power`. | — |
+| `generate_grayscale_video.m` | Generates a synthetic grayscale video and reads it back as a 3D tensor. | — |
+| `convert_video_to_tensor.m` | Reads an MP4, converts to grayscale, saves as a `.mat` tensor. | — |
+| `write_tensor_into_video.m` | Writes a 3D uint8 tensor to an uncompressed AVI file at 30 fps. | — |
+| `timings_1D.m` | Benchmarks `FT1step_m`, `FWT1step_m_VP`, and `wavedec` across signal lengths. | `FT1step_m`, `FWT1step_m_VP` |
+
+### Unit Tests
+
+| File | What it tests | Local Dependencies |
+|------|---------------|--------------------|
+| `test_FT1step_IFT1step.m` | Perfect reconstruction: `IFT1step_m( FT1step_m(a) ) ≈ a` | `FT1step_m`, `IFT1step_m` |
+| `test_FWTmatrix1_IFWTmatrix.m` | Perfect reconstruction on a 1000×1000 matrix. | `FWTmatrix1_m`, `IFWTmatrix_m` |
+| `test_FWT_IFWTtensor.m` | Six round-trip tests on VP 3D tensors (aligned, padded, asymmetric, large, constant, quasi-2D). | `FWTtensor1_m_VP`, `IFWTtensor_m_VP` |
+| `test_TR1D_ITR1D.m` | `ITR1D( TR1D(f) ) ≈ f` | `TR1D`, `ITR1D`, `compute_nu` |
+| `test_TR2D_ITR2D.m` | `ITR2D( TR2D(F) ) ≈ F` on a 1000×900 matrix. | `TR2D`, `ITR2D` |
+| `test_imagecompression_tensor_VP.m` | Full pipeline test: `DEC3D_VP → THR3D_VP → IFWTtensor_m_VP`, covering lossless, quality sweeps, and both threshold modes. | `DEC3D_VP`, `IFWTtensor_m_VP`, `THR3D_VP` |
+| `test_roundtrip3D.m` | `DEC3D → IFWTmatrix3D_m` round-trip on five tensor sizes including non-multiples of 3. | `DEC3D`, `IFWTmatrix3D_m` |
+| `test01.m` | Diagnostic: checks `TR1D` output dimensions for row vs. column inputs. | `TR1D`, `compute_nu` |
+
+---
+
+## Test Images
+
+Three standard benchmark images are included in `Images/`:
+
+| File | Size | Color |
+|------|------|-------|
+| `lena512.bmp` | 512×512 | Grayscale |
+| `peppers512.tiff` | 512×512 | Color |
+| `baboon512.tiff` | 512×512 | Color |
+
+---
+
+## Dependency Graph
+
+The diagram below shows how project files call each other (MATLAB built-ins omitted). Leaf nodes at the top have no local dependencies and form the foundation of the library; pipelines at the bottom assemble everything together.
+
 ```
+Leaf functions (no local dependencies)
+───────────────────────────────────────
+FT1step_m           IFT1step_m
+FT1step_m_fast      IFWT1step_m_VP
+FWT1step_m_VP       TR1D / ITR1D
+FWT1step_m_VP_fast  compute_nu
+THR / THR3D         THR_other
 
-### Compress a single colour image (OW wavelets)
+1D → Multi-level 2D transforms
+────────────────────────────────
+FT1step_m       ──► FWTmatrix1_m    ──► FWTmatrix3D_m
+FWT1step_m_VP   ──► FWTmatrix1_m_VP ──► FWTtensor1_m_VP
+IFT1step_m      ──► IFWTmatrix_m    ──► IFWTmatrix3D_m
+IFWT1step_m_VP  ──► IFWTmatrix_m_VP ──► IFWTtensor_m_VP
 
-```matlab
-[RESULTS_GLOBAL] = imagecompression_color_OW('path/to/image.png');
-```
+TR / ITR chain
+──────────────
+compute_nu, TR1D  ──► TR2D, TR3D
+compute_nu, ITR1D ──► ITR2D, ITR3D
 
-### Compress a 3-D tensor (VP wavelets)
+THR chain
+─────────
+THR ──► THR3D_VP
 
-The tensor can be a `.mat` file containing a 3-D double array, or a folder of grayscale PNG/BMP/JPG frames.
+High-level decomposition / reconstruction
+───────────────────────────────────────────
+FWTmatrix1_m              ──► DEC, DEC_3D
+FWTmatrix1_m_VP           ──► DEC_VP
+FWTmatrix1_m + TR2D       ──► DEC_new
+FWTmatrix3D_m             ──► DEC3D
+FWTtensor1_m_VP           ──► DEC3D_VP
+IFT1step_m + ITR2D        ──► REC_new
 
-```matlab
-[RESULTS_GLOBAL, Ifin] = imagecompression_tensor_VP('path/to/tensor.mat');
-% or
-[RESULTS_GLOBAL, Ifin] = imagecompression_tensor_VP('path/to/frames_folder/');
-```
+2D OW compression pipelines
+─────────────────────────────
+DEC + IFWTmatrix_m + TR2D + ITR2D + THR
+  ──► imagecompression
+  ──► imagecompression_color_OW  (+_par, +_PSNR_SSIM, +_YCbCr)
 
-### Compress a 3-D tensor (OW wavelets)
+DEC_new + REC_new + THR
+  ──► imagecompression_color_OW_new  (+_par)
 
-```matlab
-[RESULTS_GLOBAL, Ifin] = imagecompression_tensor_OW('path/to/tensor.mat');
-```
+2D VP compression pipeline
+───────────────────────────
+DEC_VP + IFWTmatrix_m_VP + THR
+  ──► imagecompression_color_VP  (+_par, +_YCbCr)
 
-### Compress a 3-D tensor (MATLAB wavedec3 baseline)
+2D baseline (built-in wavelets)
+────────────────────────────────
+THR_other
+  ──► imagecompression_color_other  (+_PSNR_SSIM, +_YCbCr)
 
-```matlab
-[RESULTS_GLOBAL, Ifin] = imagecompression_tensor_wavedec3('path/to/tensor.mat');
-```
+3D OW tensor pipeline
+──────────────────────
+DEC3D + IFWTmatrix3D_m + TR3D + ITR3D + THR3D
+  ──► imagecompression_tensor_OW
 
-### Convert a video to a tensor
+3D VP tensor pipeline
+──────────────────────
+DEC3D_VP + IFWTtensor_m_VP + THR3D_VP
+  ──► imagecompression_tensor_VP  (+test)
 
-```matlab
-% Edit convert_video_to_tensor.m to set the video path, then run:
-convert_video_to_tensor
-% Produces a uint8 tensor of size (H x W x nFrames)
-```
+Batch processing
+─────────────────
+imagecompression_color_OW_YCbCr ──► compression_of_images_of_a_folder
+imagecompression_color_OW_par   ──► compression_of_images_of_a_folder_par
 
-### Compress all images in a folder
-
-```matlab
-% Edit compression_of_images_of_a_folder.m to set image_dir, then run:
-compression_of_images_of_a_folder
+Analysis
+─────────
+analyze         ──► run_analysis, run_analysis_YCbCr
+analyze_timings ──► main_analyze_timings
 ```
 
 ---
 
-## Function Reference
+## MATLAB Toolbox Requirements
 
-### 1-D Building Blocks
+| Toolbox | Functions used | Required by |
+|---------|---------------|-------------|
+| **Signal Processing** | `dct` | `FT1step_m`, `FT1step_m_fast`, `FWT1step_m_VP`, `FWT1step_m_VP_fast`, `IFT1step_m`, `IFWT1step_m_VP`, `TR1D`, `ITR1D` |
+| **Wavelet** | `wavedec2`, `waverec2`, `wavedec3`, `waverec3` | `imagecompression_color_other*`, `imagecompression_tensor_wavedec3`, `timings_1D` |
+| **Image Processing** | `imread`, `imshow`, `im2gray`, `rgb2ycbcr`, `ycbcr2rgb`, `ssim` | All `imagecompression_color_*` and `imagecompression_tensor_*` functions |
+| **Parallel Computing** | `parfor` | `imagecompression_color_OW_par`, `imagecompression_color_OW_new_par`, `imagecompression_color_VP_par`, `compression_of_images_of_a_folder_par` |
 
-| Function | Description |
-|----------|-------------|
-| `FT1step_m(a, theta)` | OW one-step forward transform. Returns scaling (`anew`), wavelet (`bnew`) coefficients and padding count (`nplus`). |
-| `FT1step_m_fast(a, theta)` | Optimised version of `FT1step_m` using vectorised padding. |
-| `IFT1step_m(a, b, theta)` | OW one-step inverse transform. |
-| `FWT1step_m_VP(a, theta, fsca, fwav)` | VP one-step forward transform with explicit normalization factors. |
-| `FWT1step_m_VP_fast(a, theta, fsca, fwav)` | Optimised VP forward transform. |
-| `IFWT1step_m_VP(a, b, theta, fsca, fwav)` | VP one-step inverse transform. |
-
-All 1-D functions expect **column vector** input. The input length `N1` is automatically padded to the next multiple of 3.
-
-### 2-D Forward & Inverse Transforms
-
-| Function | Description |
-|----------|-------------|
-| `FWTmatrix1_m(A, theta, kmax, dmin)` | OW multi-level 2-D forward transform. Returns cell array `Adec`, `lrow`, `lcol`. |
-| `FWTmatrix1_m_VP(A, theta, kmax, dmin, fsca, fwav)` | VP multi-level 2-D forward transform. |
-| `IFWTmatrix_m(Adec, lrow, lcol, theta)` | OW multi-level 2-D inverse transform. |
-| `IFWTmatrix_m_VP(Adec, lrow, lcol, theta, fsca, fwav)` | VP multi-level 2-D inverse transform. |
-
-### 3-D Forward & Inverse Transforms
-
-| Function | Description |
-|----------|-------------|
-| `FWTmatrix3D_m(A, theta, kmax, dmin)` | OW multi-level 3-D forward transform. Returns `Adec`, `lrow`, `lcol`, `lslice`. |
-| `FWTtensor1_m_VP(A, theta, kmax, dmin, fsca, fwav)` | VP multi-level 3-D forward transform. |
-| `IFWTmatrix3D_m(Adec, lrow, lcol, lslice, theta)` | OW multi-level 3-D inverse transform. |
-| `IFWTtensor_m_VP(Adec, lrow, lcol, lslice, theta, fsca, fwav)` | VP multi-level 3-D inverse transform. |
-
-The 3-D transforms apply 1-D transforms sequentially along **columns (dim 1) → rows (dim 2) → slices (dim 3)**. The inverse applies them in the reverse order.
-
-### Decomposition Wrappers
-
-These functions pad the input, call the forward transform, and split the result into a scaling vector `Iscal` and wavelet vector `Iwav`.
-
-| Function | Dims | Family |
-|----------|------|--------|
-| `DEC(I, theta, kstep, dmin)` | 2-D | OW |
-| `DEC_new(I, theta, kstep, dmin, initial_transformation)` | 2-D | OW + TR2D option |
-| `DEC_VP(I, theta, kstep, dmin, fsca, fwav)` | 2-D | VP |
-| `DEC_3D(I, theta, kstep, dmin)` | 3-D | OW |
-| `DEC3D(I, theta, kstep, dmin)` | 3-D | OW (clean) |
-| `DEC3D_VP(I, theta, kstep, dmin, fsca, fwav)` | 3-D | VP |
-
-**Subband structure per decomposition step:**
-
-- **2-D:** 1 scaling block (LL) + 3 wavelet subbands (LH, HL, HH)
-- **3-D:** 1 scaling block (LLL) + 7 wavelet subbands (LLH, LHL, LHH, HLL, HLH, HHL, HHH)
-
-### Image Compression — 2D Colour
-
-All functions take a single `filepath` argument (path to a colour image) and return `RESULTS_GLOBAL`.
-
-| Function | Method | Notes |
-|----------|--------|-------|
-| `imagecompression_color_OW(filepath)` | OW | Standard |
-| `imagecompression_color_OW_par(filepath)` | OW | R/G/B channels in `parfor` |
-| `imagecompression_color_OW_new(filepath)` | OW | Includes initial TR2D spectral transform |
-| `imagecompression_color_OW_new_par(filepath)` | OW | New + parallelised |
-| `imagecompression_color_OW_PSNR_SSIM(filepath)` | OW | Dual optimisation: best MSE and best SSIM reported separately |
-| `imagecompression_color_VP(filepath)` | VP | Standard |
-| `imagecompression_color_VP_par(filepath)` | VP | R/G/B channels in `parfor` |
-| `imagecompression_color_other(filepath)` | db2 / bior3.5 | Baseline using MATLAB `wavedec2` |
-| `imagecompression_color_other_PSNR_SSIM(filepath)` | db2 | Baseline with dual optimisation |
-
-### Tensor Compression — 3D
-
-| Function | Method | Input |
-|----------|--------|-------|
-| `imagecompression_tensor_OW(filepath)` | OW | `.mat` file or folder of frames |
-| `imagecompression_tensor_VP(filepath)` | VP | `.mat` file or folder of frames |
-| `imagecompression_tensor_wavedec3(filepath)` | MATLAB wavedec3 | `.mat` file or folder of frames |
-
-All tensor functions return `[RESULTS_GLOBAL, Ifin]` where `Ifin` is the reconstructed tensor after compression with the best `theta`.
-
-### Utility & Analysis
-
-| Function | Description |
-|----------|-------------|
-| `compute_nu(n, m)` | Compute the `nu` weight vector used in spectral transforms. |
-| `ITR1D(a, nu)` / `ITR2D(A, theta)` / `ITR3D(A, theta)` | Inverse spectral (initial) transform in 1-D, 2-D, and 3-D. |
-| `analyze(res, factor)` | Average `RESULTS_best` over a cell array of `RESULTS_GLOBAL` structs. |
-| `analyze_PSNR_SSIM(res, factor)` | Same as `analyze` but for the PSNR+SSIM variant. |
-| `analyze_timings(RESULTS_GLOBAL, factor, kmin)` | Compute average timing per image size and decomposition level. |
-| `check_RESULTS_GLOBAL` | Script: inspect the range of theta values and decomposition levels across a batch. |
-| `convert_video_to_tensor` | Script: read a video file and save as a `uint8` tensor `(H × W × nFrames)`. |
-| `generate_grayscale_video` | Script: generate a synthetic uncompressed AVI and read it back as a tensor. |
-| `generate_random_images(max_power)` | Generate random RGB PNG images of sizes `2^4` up to `2^max_power`. |
-
----
-
-## Key Parameters
-
-| Parameter | Description | Typical values |
-|-----------|-------------|----------------|
-| `theta` | Localization degree of the wavelet. Controls the overlap between scaling and wavelet spaces. Searched over a grid to minimise MSE. | `0.1 : 0.1 : 0.9` |
-| `keep` | Fraction of wavelet coefficients retained after thresholding. `keep=1` = lossless; `keep=0.005` = high compression. | `[0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005]` |
-| `kstep` | Maximum number of decomposition levels. | `3` to `Kmax = floor(log(min_dim)/log(3))` |
-| `dmin` | Minimum dimension of the scaling sub-block; decomposition stops when any axis reaches this size. | `3` |
-| `flag` | `0` = threshold all coefficients (scaling + wavelet); `1` = threshold wavelet only (preserve scaling). | `1` |
-| `fsca` | Normalization factor for scaling coefficients (VP family only). | `sqrt(3)` |
-| `fwav` | Normalization factor for wavelet coefficients (VP family only). | `sqrt(3/2)` |
-
----
-
-## Output Structure
-
-All compression functions return a `RESULTS_GLOBAL` struct with the following fields:
-
-| Field | Description |
-|-------|-------------|
-| `name` | Input filepath |
-| `RESULTS` | Matrix of all (keep, kstep, theta) combinations: `[keep, PSNR, SSIM, %retained, best_theta, decomp_levels]` |
-| `RESULTS_best` | Best row per `keep` value (highest PSNR) |
-| `TIMES` | Timing matrix: `[kstep, keep, theta, t_decomp, t_threshold, t_reconstruct, MSE]` |
-| `size` | Original input dimensions `[N, M]` (2-D) or `[N, M, P]` (3-D) |
-
----
-
-## Requirements
-
-- **MATLAB R2019b or later** (for `squeeze`, `dct` Type-3, `ssim`)
-- **Image Processing Toolbox** (for `ssim`, `imread`, `imshow`)
-- **Parallel Computing Toolbox** (optional — only required for `_par` variants)
-- **Wavelet Toolbox** (optional — only required for `imagecompression_tensor_wavedec3` and the `other` baselines)
+The Parallel Computing Toolbox is optional — all `_par` functions have sequential equivalents.

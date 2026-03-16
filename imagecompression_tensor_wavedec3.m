@@ -10,7 +10,7 @@ function [RESULTS_GLOBAL, Ifin] = imagecompression_tensor_wavedec3(filepath)
 flag   = 1;     % 0 = compress all coefficients, 1 = compress details only
 
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
-vkeep  = [0.005];
+vkeep  = [0.001];
 vwname = {'haar', 'db2', 'db4', 'sym4'};
 vwname = {'db2'};
 

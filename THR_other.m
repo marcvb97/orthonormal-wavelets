@@ -17,10 +17,14 @@ else
     num*keep-Nsca;
 
     ii=floor(num*keep-Nsca);
-    if ii>Nwav || ii<1
+    if ii>Nwav
         thr=10^3;
         zero_el=0;
         Icomp=Idec;
+    elseif ii < 1
+        X(1:end) = 0;
+        zero_el=length(X);
+        Icomp = [Idec(1:Nsca), X];
     else
         X(I(ii+1:end)) = 0.0;
         zero_el = length(I)-ii;

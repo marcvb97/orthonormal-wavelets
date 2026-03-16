@@ -12,12 +12,12 @@ flag = 1;   % 0 = compress all coefficients, 1 = compress details only
 threshold_type = 1; % 1 = separately, 2 = combined over the channels
 
 vkeep  = [0.5, 0.25, 0.10, 0.05, 0.02, 0.01, 0.005];
-vkeep  = [0.5];
+% vkeep  = [0.5];
 vtheta = [0.0];
 % vtheta = [0.5];
 
-wname='db2';
-% wname='bior3.5';
+% wname='db2';
+wname='bior3.5';
 
 % normalization factors for the 1step transforms
 % NB in decomposing we multiply the output by these factors
@@ -39,16 +39,16 @@ B = double(II(:,:,3));
 
 %% Decomposition parameters
 Kmax = floor(log(min(Nor,Mor))/log(2) + 1.0e-12);
-Kmax = 4;
+Kmax = 5;
 dmin = 3;
 
 %% Main loop
-RESULTS = zeros((Kmax-4+1) * length(vkeep), 6);
-TIMES   = zeros((Kmax-4+1) * length(vkeep) * length(vtheta), 7);
+RESULTS = zeros((Kmax-5+1) * length(vkeep), 6);
+TIMES   = zeros((Kmax-5+1) * length(vkeep) * length(vtheta), 7);
 cont = 0;
 cont_time = 0;
 
-for kstep = 4:Kmax
+for kstep = 5:Kmax
     for keep = vkeep
         cont = cont + 1;
         cont_time = cont_time+1;

@@ -1,6 +1,8 @@
 
+clear all
+close all
 % Set the directory path
-image_dir = '../URBAN100';
+image_dir = '../NY96';
 
 % Get all image files (adjust extensions as needed)
 extensions = {'*.png', '*.jpg', '*.tiff', '*.bmp'};
@@ -24,7 +26,7 @@ for i = 1:length(files)
     for k = 1:1
         k
         ii = ii+1;
-        RESULTS_GLOBAL{ii} = imagecompression_color_OW(filepath);
+        RESULTS_GLOBAL{ii} = imagecompression_color_OW_YCbCr(filepath);
     end
 
     % % Save result (example: save as PNG with a new name)
@@ -36,4 +38,4 @@ for i = 1:length(files)
 end
 
 %%
-save URBAN100_OW2.mat
+save('mat/NY96_OW2_YCbCr.mat','RESULTS_GLOBAL')
